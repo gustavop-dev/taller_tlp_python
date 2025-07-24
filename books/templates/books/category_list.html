@@ -1,0 +1,382 @@
+{% extends 'books/base.html' %}
+
+{% block title %}Lista de Categorías - Gestión de Libros{% endblock %}
+
+{% block content %}
+<!-- Agregar CSRF token para peticiones AJAX -->
+{% csrf_token %}
+<div class="px-4 sm:px-0">
+    <!-- Header -->
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-semibold text-gray-900">📂 Gestión de Categorías</h1>
+            <p class="mt-2 text-sm text-gray-700">Administra las categorías de libros del sistema.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <button type="button" onclick="openAddCategoryModal()" class="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 sm:w-auto">
+                ➕ Agregar Categoría
+            </button>
+        </div>
+    </div>
+
+    <!-- Categories Grid -->
+    <div id="categories-grid" class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <!-- Categories will be loaded here -->
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loading" class="text-center py-8 hidden">
+        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-white bg-primary-500">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Cargando categorías...
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Crear/Editar Categoría -->
+<div id="categoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900" id="categoryModalTitle">Agregar Nueva Categoría</h3>
+                <button onclick="closeCategoryModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="categoryForm" class="space-y-6">
+                <div>
+                    <label for="categoryName" class="block text-sm font-medium text-gray-700">Nombre *</label>
+                    <input type="text" id="categoryName" name="name" required maxlength="100" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                </div>
+                
+                <div>
+                    <label for="categoryDescription" class="block text-sm font-medium text-gray-700">Descripción</label>
+                    <textarea id="categoryDescription" name="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                </div>
+                
+                <div>
+                    <label for="categoryActive" class="flex items-center">
+                        <input type="checkbox" id="categoryActive" name="is_active" checked class="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50">
+                        <span class="ml-2 text-sm text-gray-700">Activa</span>
+                    </label>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeCategoryModal()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
+                        <span id="categorySubmitButtonText">Crear Categoría</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Categoría -->
+<div id="deleteCategoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mt-2">Confirmar Eliminación</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    ¿Está seguro de que desea desactivar esta categoría? Esta acción se puede revertir posteriormente.
+                </p>
+            </div>
+            <div class="flex justify-center space-x-3 mt-4">
+                <button onclick="closeDeleteCategoryModal()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                </button>
+                <button id="confirmDeleteCategoryBtn" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+                    Desactivar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables globales
+    let allCategories = [];
+
+    // Función para obtener CSRF token
+    function getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    // Cargar datos iniciales
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCategories();
+    });
+
+    // Función para cargar categorías
+    async function loadCategories() {
+        showLoading(true);
+        try {
+            const response = await fetch('/api/categories/');
+            const data = await response.json();
+            allCategories = data.results || data;
+            
+            displayCategories(allCategories);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            showToast('Error al cargar categorías', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // Función para mostrar/ocultar loading
+    function showLoading(show) {
+        document.getElementById('loading').classList.toggle('hidden', !show);
+    }
+
+    // Función para mostrar categorías
+    function displayCategories(categories) {
+        const grid = document.getElementById('categories-grid');
+        
+        if (categories.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-8 text-gray-500">
+                    No se encontraron categorías
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = categories.map(category => `
+            <div class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200">
+                <div class="p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span class="text-3xl">📂</span>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-lg font-medium text-gray-900">${category.name}</h3>
+                            <p class="text-sm text-gray-500 mt-1">${category.description || 'Sin descripción'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${category.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                ${category.is_active ? '✅ Activa' : '❌ Inactiva'}
+                            </span>
+                            <span class="text-sm text-gray-500">
+                                📚 ${category.books_count || 0} libros
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-end space-x-2">
+                        <button onclick="viewCategoryBooks(${category.id})" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                            Ver Libros
+                        </button>
+                        <button onclick="editCategory(${category.id})" class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                            ✏️ Editar
+                        </button>
+                        ${category.is_active ? 
+                            `<button onclick="deactivateCategory(${category.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">
+                                ❌ Desactivar
+                            </button>` :
+                            `<button onclick="activateCategory(${category.id})" class="text-green-600 hover:text-green-900 text-sm font-medium">
+                                ✅ Activar
+                            </button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Funciones de acciones sobre categorías
+    function viewCategoryBooks(categoryId) {
+        window.location.href = `/books/?category=${categoryId}`;
+    }
+
+
+
+
+
+    async function activateCategory(categoryId) {
+        try {
+            const response = await fetch(`/api/categories/${categoryId}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: JSON.stringify({
+                    is_active: true
+                })
+            });
+            
+            if (response.ok) {
+                showToast('Categoría activada exitosamente');
+                loadCategories();
+            } else {
+                showToast('Error al activar categoría', 'error');
+            }
+        } catch (error) {
+            console.error('Error activating category:', error);
+            showToast('Error al activar categoría', 'error');
+        }
+    }
+
+    // Variables para modales de categorías
+    let currentCategoryId = null;
+    let isCategoryEditMode = false;
+
+    // Funciones para el modal de categoría
+    function openAddCategoryModal() {
+        isCategoryEditMode = false;
+        currentCategoryId = null;
+        document.getElementById('categoryModalTitle').textContent = 'Agregar Nueva Categoría';
+        document.getElementById('categorySubmitButtonText').textContent = 'Crear Categoría';
+        clearCategoryForm();
+        document.getElementById('categoryModal').classList.remove('hidden');
+    }
+
+    function editCategory(categoryId) {
+        isCategoryEditMode = true;
+        currentCategoryId = categoryId;
+        document.getElementById('categoryModalTitle').textContent = 'Editar Categoría';
+        document.getElementById('categorySubmitButtonText').textContent = 'Actualizar Categoría';
+        
+        // Buscar la categoría en la lista actual
+        const category = allCategories.find(c => c.id === categoryId);
+        if (category) {
+            populateCategoryForm(category);
+            document.getElementById('categoryModal').classList.remove('hidden');
+        } else {
+            // Si no está en la lista actual, hacer petición a la API
+            fetch(`/api/categories/${categoryId}/`)
+                .then(response => response.json())
+                .then(category => {
+                    populateCategoryForm(category);
+                    document.getElementById('categoryModal').classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error loading category:', error);
+                    showToast('Error al cargar la categoría', 'error');
+                });
+        }
+    }
+
+    function closeCategoryModal() {
+        document.getElementById('categoryModal').classList.add('hidden');
+        clearCategoryForm();
+    }
+
+    function clearCategoryForm() {
+        document.getElementById('categoryForm').reset();
+        document.getElementById('categoryActive').checked = true;
+    }
+
+    function populateCategoryForm(category) {
+        document.getElementById('categoryName').value = category.name || '';
+        document.getElementById('categoryDescription').value = category.description || '';
+        document.getElementById('categoryActive').checked = category.is_active !== false;
+    }
+
+    // Manejar envío del formulario de categoría
+    document.getElementById('categoryForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const categoryData = {
+            name: formData.get('name'),
+            description: formData.get('description') || '',
+            is_active: formData.get('is_active') === 'on'
+        };
+
+        try {
+            let response;
+            if (isCategoryEditMode) {
+                response = await fetch(`/api/categories/${currentCategoryId}/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(categoryData)
+                });
+            } else {
+                response = await fetch('/api/categories/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(categoryData)
+                });
+            }
+
+            if (response.ok) {
+                const message = isCategoryEditMode ? 'Categoría actualizada exitosamente' : 'Categoría creada exitosamente';
+                showToast(message);
+                closeCategoryModal();
+                loadCategories();
+            } else {
+                const errorData = await response.json();
+                let errorMessage = 'Error al guardar la categoría';
+                if (errorData.name) {
+                    errorMessage = 'Ya existe una categoría con este nombre';
+                }
+                showToast(errorMessage, 'error');
+            }
+        } catch (error) {
+            console.error('Error saving category:', error);
+            showToast('Error al guardar la categoría', 'error');
+        }
+    });
+
+    // Funciones para eliminar/desactivar categoría
+    function deactivateCategory(categoryId) {
+        currentCategoryId = categoryId;
+        document.getElementById('deleteCategoryModal').classList.remove('hidden');
+    }
+
+    function closeDeleteCategoryModal() {
+        document.getElementById('deleteCategoryModal').classList.add('hidden');
+        currentCategoryId = null;
+    }
+
+    // Confirmar desactivación de categoría
+    document.getElementById('confirmDeleteCategoryBtn').addEventListener('click', async function() {
+        if (!currentCategoryId) return;
+
+        try {
+            const response = await fetch(`/api/categories/${currentCategoryId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                }
+            });
+
+            if (response.ok) {
+                showToast('Categoría desactivada exitosamente');
+                closeDeleteCategoryModal();
+                loadCategories();
+            } else {
+                showToast('Error al desactivar la categoría', 'error');
+            }
+        } catch (error) {
+            console.error('Error deactivating category:', error);
+            showToast('Error al desactivar la categoría', 'error');
+        }
+    });
+</script>
+{% endblock %} 
